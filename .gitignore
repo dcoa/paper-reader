@@ -15,6 +15,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+*/node_modules/*
 .DS_Store
 dist
 dist-ssr
@@ -32,3 +33,15 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+
+data/*
+*/data/**/*
+# Secrets / API keys
+*_api_key.txt
+.env.*
+!.env.example
+
+# Generated dataset (run backend/build_dataset.py)
+backend/papers.json
+backend/papers_emb.json

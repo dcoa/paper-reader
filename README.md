@@ -1,0 +1,151 @@
+# Research Paper Analysis and Recommendation System
+
+> **Academic project:** This application was developed for course COMP8460. It is intended for educational purposes only.
+
+This project is a recommender and analysis system for academic research papers.
+
+The application takes a PDF, processes its content and extracts relevant metadata
+(title, authors, keywords, abstract and year). The system can also answer questions
+about the uploaded papers (RAG), generate a summary of the latest uploaded paper and
+recommend related papers.
+
+Recommendations are based on a preloaded dataset of 997 papers (metadata and abstract
+embeddings) taken from the Kaggle Cornell University
+[arXiv dataset](https://www.kaggle.com/datasets/Cornell-University/arxiv). The 10 most
+similar papers are retrieved from the vector store and passed to the LLM, which returns
+5 recommendations in APA 7 format. If fewer than 5 relevant papers are found, the list
+is completed with articles from the references of the uploaded document.
+
+## Technology Stack
+
+- **Backend**: Flask
+- **LLM**: DeepSeek (`deepseek-chat`) for Q&A answers and summaries
+- **Embeddings and metadata extraction**: SiliconFlow API
+  - Embeddings: `BAAI/bge-large-en-v1.5`
+  - Metadata extraction: `Qwen/Qwen2.5-7B-Instruct` (falls back to DeepSeek if no SiliconFlow key is set)
+- **Frontend**: Vue 3 + Element Plus + Vite
+- **PDF Processing**: PyPDF2
+- **Knowledge Base**: Chroma
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.9+
+- Node.js 16+
+- A [DeepSeek](https://platform.deepseek.com/) API key
+- A [SiliconFlow](https://siliconflow.cn/) API key
+- Conda or another virtual environment (recommended)
+
+### 1. Configure API Keys
+
+In the root folder, copy the example environment file and fill in your keys:
+
+```bash
+cp .env.example .env
+```
+
+```
+DEEPSEEK_API_KEY=your-deepseek-api-key
+SILICONFLOW_API_KEY=your-siliconflow-api-key
+SECRET_KEY=change-me
+```
+
+The `.env` file is ignored by git. Never commit your real keys.
+
+### 2. Generate the Preloaded Papers
+
+The recommendation dataset (`backend/papers_emb.json`) is not stored in the repository
+because of its size. Generate it once before starting the backend:
+
+```bash
+cd backend/
+
+# Install the dataset dependencies (includes the backend dependencies)
+pip install -r requirements-dataset.txt
+
+# Download the arXiv dataset with kagglehub and build papers_emb.json
+python build_dataset.py
+```
+
+The script reads the first 1000 records of the arXiv dataset, keeps the papers with a
+meaningful title and abstract (997 papers) and embeds each abstract locally with
+`BAAI/bge-large-en-v1.5`. The first run downloads the arXiv dataset (several GB) and the
+embedding model (about 1.3 GB), so it can take a while. kagglehub may ask for
+[Kaggle API credentials](https://github.com/Kaggle/kagglehub#authenticate).
+
+If you already have the dataset, pass the file directly:
+
+```bash
+python build_dataset.py --arxiv-path /path/to/arxiv-metadata-oai-snapshot.json
+```
+
+Without this file the backend still starts, but no preloaded papers are available for
+recommendations.
+
+### 3. Start Backend
+
+Open a terminal in the root folder. It is recommended to run the application
+in a virtual environment.
+
+```bash
+# Move inside the backend folder
+cd backend/
+
+# Install dependencies (if needed)
+pip install -r requirements.txt
+
+# Start the server
+python app.py
+```
+
+Backend will run at `http://localhost:5000`
+
+On the first start, the preloaded papers in `backend/papers_emb.json` are loaded into
+the Chroma knowledge base.
+
+### 4. Start Frontend
+
+Open a second terminal in the root folder to start the frontend application.
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies (first time)
+npm ci
+
+# Start development server
+npm run dev
+```
+
+Frontend will run at `http://localhost:3000`. Requests to `/api` are proxied to the backend.
+
+### 5. Access System
+
+Open `http://localhost:3000` in your browser.
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/upload` | POST | Upload a PDF file, extract its metadata and add it to the knowledge base |
+| `/api/ask` | POST | Ask a question, answered from the most relevant chunks in the knowledge base |
+| `/api/summarize` | POST | Summarize the latest uploaded paper and recommend related papers |
+| `/api/stats` | GET | Get knowledge base statistics |
+| `/api/clear` | POST | Clear the knowledge base |
+
+## Configuration Parameters
+
+Adjustable in `backend/config/settings.py`:
+
+- `CHUNK_SIZE`: Text chunk size in words (default: 500)
+- `CHUNK_OVERLAP`: Chunk overlap in words (default: 50)
+- `TOP_K`: Number of chunks retrieved to answer a question (default: 3)
+- `MAX_CONTENT_LENGTH`: Maximum upload size (default: 50 MB)
+
+## Limitations
+
+- `/api/summarize` only works on the most recently uploaded paper.
+- Recommendations completed from the paper's references are generated by the LLM
+  and should be verified, as they may be inaccurate.
