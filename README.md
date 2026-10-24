@@ -189,6 +189,27 @@ Frontend will run at `http://localhost:3000`. Requests to `/api` are proxied to 
 
 Open `http://localhost:3000` in your browser.
 
+## Running Tests
+
+The tests use fake LLM and embedding responses and a temporary knowledge base, so they need
+no API keys, no network and do not touch your `.env` or the real knowledge base.
+
+**Backend** (pytest, unit tests for the services and API tests for every endpoint):
+
+```bash
+cd backend/
+pip install -r requirements-dev.txt
+pytest
+```
+
+**Frontend** (Vitest + Vue Test Utils, component tests for upload, Q&A and summary):
+
+```bash
+cd frontend/
+npm install
+npm test
+```
+
 ## API Endpoints
 
 | Endpoint | Method | Description |

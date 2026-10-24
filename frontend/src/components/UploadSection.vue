@@ -58,6 +58,8 @@ import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { uploadPDF } from '../api'
 
+const emit = defineEmits(['upload-success'])
+
 const selectedFile = ref(null)
 const uploading = ref(false)
 const uploadProgress = ref(0)
@@ -85,6 +87,8 @@ const uploadFile = async () => {
 
     uploadResult.value = response.data
     ElMessage.success('PDF processed successfully!')
+    // Lets the header refresh the document count
+    emit('upload-success')
   } catch (error) {
     if (error.response?.status === 409 && error.response.data?.duplicate) {
       uploadResult.value = error.response.data
