@@ -56,32 +56,27 @@ User question: {question}
 
 Please provide an accurate and detailed answer based on the above paper content. If the paper content does not contain relevant information, please state it clearly. Answer in English."""
 
-        try:
-            response = requests.post(
-                f"{self.api_base}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [
-                        {"role": "system", "content": "You are a professional academic paper Q&A assistant, skilled at understanding and explaining academic paper content. Always respond in English."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 2000
-                },
-                timeout=60
-            )
+        response = requests.post(
+            f"{self.api_base}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "You are a professional academic paper Q&A assistant, skilled at understanding and explaining academic paper content. Always respond in English."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 2000
+            },
+            timeout=60
+        )
 
-            if response.status_code == 200:
-                result = response.json()
-                answer = result['choices'][0]['message']['content']
-                return answer
-            else:
-                return f"Error generating answer: API returned status code {response.status_code}"
+        # Raise instead of returning the error as the answer, the route logs it
+        if response.status_code != 200:
+            raise Exception(f"DeepSeek API returned {response.status_code}: {response.text[:200]}")
 
-        except Exception as e:
-            return f"Error generating answer: {str(e)}"
+        return response.json()['choices'][0]['message']['content']
 

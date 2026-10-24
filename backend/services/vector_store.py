@@ -53,6 +53,8 @@ class VectorStore:
                         documents.append(embedding['text'])
                         vectors.append(embedding['embedding'])
                     self.add_documents(documents=documents, vectors=vectors, metadata=metadata)
+                # Preloaded papers are only for recommendations, not the current paper
+                self.last_processed_metadata = None
                 self.loaded_mock_data = True
                 print("Mock data loaded.")
 
@@ -185,6 +187,7 @@ class VectorStore:
         Clears all data from the Chroma collection.
         """
         self.collection.delete(self.collection.get()['ids'])
+        self.last_processed_metadata = None
     
     def get_latest_document(self) -> Dict:
         """

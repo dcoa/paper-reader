@@ -1,6 +1,6 @@
 import hashlib
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from config import Config
 from services import PDFProcessor, MetadataExtractor, Embedder, VectorStore, RAGEngine, Summarizer
@@ -16,6 +16,11 @@ summarizer = Summarizer()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
+
+def error_response(log_message, user_message):
+    # Keep API/model details in the server log, the UI only gets a generic message
+    current_app.logger.exception(log_message)
+    return jsonify({'error': user_message}), 500
 
 def duplicate_response(filename, existing):
     # Use the stored paper for Q&A and summaries instead of adding it again
@@ -81,8 +86,8 @@ def upload_pdf():
             'num_chunks': pdf_result['num_chunks']
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+    except Exception:
+        return error_response('Processing failed', 'The PDF could not be processed. Please try again later.')
 
 @api_bp.route('/ask', methods=['POST'])
 def ask_question():
@@ -97,31 +102,31 @@ def ask_question():
         result = rag_engine.answer_question(question, top_k=Config.TOP_K)
         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({'error': f'Q&A failed: {str(e)}'}), 500
+    except Exception:
+        return error_response('Q&A failed', 'The question could not be answered. Please try again later.')
 
 @api_bp.route('/stats', methods=['GET'])
 def get_stats():
     try:
         stats = vector_store.get_stats()
         return jsonify(stats), 200
-    except Exception as e:
-        return jsonify({'error': f'Failed to get statistics: {str(e)}'}), 500
+    except Exception:
+        return error_response('Failed to get statistics', 'Statistics are not available right now.')
 
 @api_bp.route('/clear', methods=['POST'])
 def clear_database():
     try:
         vector_store.clear()
         return jsonify({'message': 'Knowledge base cleared successfully'}), 200
-    except Exception as e:
-        return jsonify({'error': f'Failed to clear: {str(e)}'}), 500
+    except Exception:
+        return error_response('Failed to clear', 'The knowledge base could not be cleared. Please try again later.')
 
 @api_bp.route('/summarize', methods=['POST'])
 def summarize_paper():
     try:
-        stats = vector_store.get_stats()
-        if stats['total_documents'] == 0:
-            return jsonify({'error': 'No documents in knowledge base. Please upload a PDF first.'}), 400
+        # The current paper is kept in memory, so it is lost when the backend restarts
+        if vector_store.last_processed_metadata is None:
+            return jsonify({'error': 'No paper selected. Please upload a PDF first.'}), 400
 
         full_text, latest_metadata = vector_store.get_latest_document()
         full_embedding = embedder.embed_query(full_text)
@@ -137,6 +142,6 @@ def summarize_paper():
         result = summarizer.generate_summary_and_recommendations(latest_metadata, full_text, recomended_papers_string)
         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({'error': f'Summarization failed: {str(e)}'}), 500
+    except Exception:
+        return error_response('Summarization failed', 'The summary could not be generated. Please try again later.')
 
