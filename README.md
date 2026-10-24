@@ -16,6 +16,26 @@ similar papers are retrieved from the vector store and passed to the LLM, which 
 5 recommendations in APA 7 format. If fewer than 5 relevant papers are found, the list
 is completed with articles from the references of the uploaded document.
 
+![Screenshot of the application: upload panel, Q&A chat and summary panel](docs/images/app-screenshot.png)
+
+## Architecture
+
+![Workflow diagram of the system: PDF extraction, pre-processing, chunking, vectorization, metadata extraction, RAG, Q&A, summarization and recommendation](docs/images/architecture-diagram.png)
+
+1. **PDF upload and extraction:** the user uploads a PDF and its raw text is extracted.
+2. **Pre-processing and chunking:** the text is cleaned and split into overlapping chunks.
+3. **Vectorization:** each chunk is turned into a sentence embedding and stored in the
+   vector database (Chroma).
+4. **Metadata extraction:** an LLM extracts the title, authors, keywords, abstract and year.
+5. **Q&A:** a question is embedded, the most similar chunks are retrieved (RAG) and the
+   LLM answers from them, returning the answer with its sources.
+6. **Summarization and recommendation:** the full text of the uploaded paper is retrieved,
+   related papers are found by semantic search, and the LLM writes a summary and
+   recommends related papers.
+
+Classic NLP techniques (cleaning, chunking, embeddings) prepare the text, and LLM-based
+prompt engineering is used for metadata extraction, Q&A, summarization and recommendation.
+
 ## Technology Stack
 
 - **Backend**: Flask
