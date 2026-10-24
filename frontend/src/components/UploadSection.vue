@@ -37,12 +37,16 @@
       style="margin-top: 20px;"
     />
 
-    <div v-if="uploadResult" class="upload-result">
-      <h3>Processing Result</h3>
+    <div v-if="uploadResult" class="upload-result" :class="{ duplicate: uploadResult.duplicate }">
+      <h3>{{ uploadResult.duplicate ? 'Paper Already in Database' : 'Processing Result' }}</h3>
+      <p v-if="uploadResult.duplicate" class="duplicate-note">
+        This paper was not added again. The stored version is shown below.
+      </p>
       <p><strong>Filename:</strong> {{ uploadResult.filename }}</p>
       <p><strong>Title:</strong> {{ uploadResult.metadata.title }}</p>
-      <p><strong>Authors:</strong> {{ uploadResult.metadata.authors.join(', ') || 'Not identified' }}</p>
-      <p><strong>Keywords:</strong> {{ uploadResult.metadata.keywords.join(', ') || 'Not identified' }}</p>
+      <p><strong>Authors:</strong> {{ (uploadResult.metadata.authors || []).join(', ') || 'Not identified' }}</p>
+      <p><strong>Keywords:</strong> {{ (uploadResult.metadata.keywords || []).join(', ') || 'Not identified' }}</p>
+      <p v-if="uploadResult.metadata.year"><strong>Year:</strong> {{ uploadResult.metadata.year }}</p>
       <p><strong>Chunks:</strong> {{ uploadResult.num_chunks }}</p>
     </div>
   </div>
@@ -82,6 +86,11 @@ const uploadFile = async () => {
     uploadResult.value = response.data
     ElMessage.success('PDF processed successfully!')
   } catch (error) {
+    if (error.response?.status === 409 && error.response.data?.duplicate) {
+      uploadResult.value = error.response.data
+      ElMessage.warning(error.response.data.error)
+      return
+    }
     ElMessage.error(error.response?.data?.error || 'Upload failed')
   } finally {
     uploading.value = false
@@ -167,6 +176,19 @@ h2 {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.upload-result.duplicate {
+  background: #FDF6EC;
+  border-left-color: #E6A23C;
+}
+
+.upload-result.duplicate h3 {
+  color: #E6A23C;
+}
+
+.upload-result .duplicate-note {
+  font-style: italic;
 }
 
 .upload-result h3 {

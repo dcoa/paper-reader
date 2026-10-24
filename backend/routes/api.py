@@ -1,3 +1,5 @@
+import hashlib
+
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 from config import Config
@@ -15,6 +17,17 @@ summarizer = Summarizer()
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
+def duplicate_response(filename, existing):
+    # Use the stored paper for Q&A and summaries instead of adding it again
+    vector_store.set_active_paper(existing['metadata'])
+    return jsonify({
+        'error': 'This paper is already in the knowledge base',
+        'duplicate': True,
+        'filename': filename,
+        'metadata': existing['metadata'],
+        'num_chunks': existing['num_chunks']
+    }), 409
+
 @api_bp.route('/upload', methods=['POST'])
 def upload_pdf():
     if 'file' not in request.files:
@@ -30,8 +43,15 @@ def upload_pdf():
 
     try:
         filename = secure_filename(file.filename)
+        file_bytes = file.read()
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        existing = vector_store.find_by_hash(file_hash)
+        if existing:
+            return duplicate_response(filename, existing)
+
         filepath = Config.UPLOAD_FOLDER / filename
-        file.save(str(filepath))
+        filepath.write_bytes(file_bytes)
 
         pdf_result = pdf_processor.process_pdf(
             str(filepath),
@@ -40,6 +60,12 @@ def upload_pdf():
         )
         metadata = metadata_extractor.extract_metadata(pdf_result['cleaned_text'])
 
+        # Same paper stored from a different file (or preloaded from arXiv)
+        existing = vector_store.find_by_title(metadata.get('title'))
+        if existing:
+            return duplicate_response(filename, existing)
+
+        metadata['file_hash'] = file_hash
         vectors = embedder.embed_documents(pdf_result['chunks'])
 
         vector_store.add_documents(

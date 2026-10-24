@@ -1,3 +1,5 @@
+import ast
+import re
 import numpy as np
 import chromadb
 from typing import List, Dict
@@ -113,6 +115,61 @@ class VectorStore:
             return []
         return formatted_results
     
+
+    @staticmethod
+    def _normalize_title(title: str) -> str:
+        return re.sub(r'[^a-z0-9]', '', title.lower())
+
+    @staticmethod
+    def _restore_metadata(metadata: Dict) -> Dict:
+        """
+        Metadata is stored as strings in Chroma, turns authors and keywords back into lists.
+        """
+        restored = dict(metadata)
+        for key in ('authors', 'keywords'):
+            value = restored.get(key, '')
+            if isinstance(value, str) and value.startswith('['):
+                try:
+                    restored[key] = ast.literal_eval(value)
+                    continue
+                except (ValueError, SyntaxError):
+                    pass
+            restored[key] = [item.strip() for item in str(value).split(',') if item.strip()]
+        return restored
+
+    def _paper_info(self, metadata: Dict) -> Dict:
+        """
+        Returns the restored metadata and number of chunks of a stored paper.
+        """
+        chunks = self.collection.get(where={"title": metadata['title']}, include=[])
+        return {'metadata': self._restore_metadata(metadata), 'num_chunks': len(chunks['ids'])}
+
+    def find_by_hash(self, file_hash: str):
+        """
+        Returns the stored paper whose PDF has the given SHA-256 hash, or None.
+        """
+        results = self.collection.get(where={"file_hash": file_hash}, limit=1, include=["metadatas"])
+        metadatas = results.get("metadatas") or []
+        return self._paper_info(metadatas[0]) if metadatas else None
+
+    def find_by_title(self, title: str):
+        """
+        Returns the stored paper with the same title (ignoring case, spacing and punctuation), or None.
+        """
+        normalized = self._normalize_title(title or '')
+        if not normalized or normalized == self._normalize_title('Unknown Title'):
+            return None
+        results = self.collection.get(include=["metadatas"])
+        for metadata in results.get("metadatas") or []:
+            if self._normalize_title(metadata.get('title', '')) == normalized:
+                return self._paper_info(metadata)
+        return None
+
+    def set_active_paper(self, metadata: Dict):
+        """
+        Makes an already stored paper the current one for summaries and recommendations.
+        """
+        self.last_processed_metadata = metadata
 
     def get_stats(self) -> Dict:
         """
