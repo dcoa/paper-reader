@@ -74,6 +74,9 @@ meaningful title and abstract (997 papers) and embeds each abstract locally with
 embedding model (about 1.3 GB), so it can take a while. kagglehub may ask for
 [Kaggle API credentials](https://github.com/Kaggle/kagglehub#authenticate).
 
+Both downloads are stored in the `cache/` folder at the project root (ignored by git). Once `papers_emb.json` is generated you can delete `cache/`
+to free the space; it is only needed to rebuild the dataset.
+
 If you already have the dataset, pass the file directly:
 
 ```bash

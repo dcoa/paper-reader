@@ -10,12 +10,17 @@ Usage:
 """
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Dict, List
 
 from tqdm import tqdm
 
 BASE_DIR = Path(__file__).resolve().parent
+# Keep downloads inside the project
+CACHE_DIR = BASE_DIR.parent / 'cache'
+os.environ.setdefault('KAGGLEHUB_CACHE', str(CACHE_DIR / 'kagglehub'))
+os.environ.setdefault('HF_HOME', str(CACHE_DIR / 'huggingface'))
 OUTPUT_FILE = BASE_DIR / 'papers_emb.json'
 KAGGLE_DATASET = 'Cornell-University/arxiv'
 ARXIV_FILENAME = 'arxiv-metadata-oai-snapshot.json'
