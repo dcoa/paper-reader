@@ -1,6 +1,6 @@
 # Research Paper Analysis and Recommendation System
 
-> **Academic project:** This application was developed for course COMP8460. It is intended for educational purposes only.
+> **Academic group project:** This application was developed as a group project for course COMP8460. It is intended for educational purposes only.
 
 This project is a recommender and analysis system for academic research papers.
 
@@ -19,10 +19,10 @@ is completed with articles from the references of the uploaded document.
 ## Technology Stack
 
 - **Backend**: Flask
-- **LLM**: DeepSeek (`deepseek-chat`) for Q&A answers and summaries
-- **Embeddings and metadata extraction**: SiliconFlow API
-  - Embeddings: `BAAI/bge-large-en-v1.5`
-  - Metadata extraction: `Qwen/Qwen2.5-7B-Instruct` (falls back to DeepSeek if no SiliconFlow key is set)
+- **LLM**: any OpenAI-compatible API (DeepSeek, OpenAI, OpenRouter, Ollama, ...) for
+  metadata extraction, Q&A answers and summaries. Default: DeepSeek (`deepseek-chat`)
+- **Embeddings**: any OpenAI-compatible embeddings API, or local with sentence-transformers.
+  Default: `BAAI/bge-large-en-v1.5` through the SiliconFlow API
 - **Frontend**: Vue 3 + Element Plus + Vite
 - **PDF Processing**: PyPDF2
 - **Knowledge Base**: Chroma
@@ -33,11 +33,13 @@ is completed with articles from the references of the uploaded document.
 
 - Python 3.9+
 - Node.js 16+
-- A [DeepSeek](https://platform.deepseek.com/) API key
-- A [SiliconFlow](https://siliconflow.cn/) API key
+- An API key for an OpenAI-compatible LLM provider, e.g. [DeepSeek](https://platform.deepseek.com/)
+  (or a local [Ollama](https://ollama.com/) server, no key needed)
+- An API key for an embeddings provider, e.g. [SiliconFlow](https://siliconflow.cn/)
+  (or local embeddings, no key needed)
 - Conda or another virtual environment (recommended)
 
-### 1. Configure API Keys
+### 1. Configure the LLM and Embeddings
 
 In the root folder, copy the example environment file and fill in your keys:
 
@@ -46,12 +48,48 @@ cp .env.example .env
 ```
 
 ```
-DEEPSEEK_API_KEY=your-deepseek-api-key
-SILICONFLOW_API_KEY=your-siliconflow-api-key
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_API_KEY=your-api-key
+LLM_MODEL=deepseek-chat
+
+EMBEDDING_PROVIDER=api
+EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
+EMBEDDING_API_KEY=your-siliconflow-api-key
+EMBEDDING_MODEL=BAAI/bge-large-en-v1.5
+
 SECRET_KEY=change-me
 ```
 
 The `.env` file is ignored by git. Never commit your real keys.
+
+#### Choosing an LLM provider
+
+The app works with any provider that offers an OpenAI-compatible API. Set `LLM_BASE_URL`,
+`LLM_API_KEY` and `LLM_MODEL`; `.env.example` has ready-to-use examples for DeepSeek,
+OpenAI, OpenRouter and Ollama. Each task can use a different model by setting
+`SUMMARY_LLM_*`, `QA_LLM_*` or `METADATA_LLM_*` (`BASE_URL`, `API_KEY`, `MODEL`, `TIMEOUT`).
+Unset values fall back to `LLM_*`.
+
+To run without any API key, use Ollama for the LLM and local embeddings:
+
+```
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_API_KEY=
+LLM_MODEL=llama3.1
+EMBEDDING_PROVIDER=local
+EMBEDDING_MODEL=BAAI/bge-large-en-v1.5
+```
+
+Local embeddings need `pip install -r backend/requirements-local.txt`. The model is
+downloaded on first use to the `cache/` folder at the project root.
+
+**Changing the embedding model:** vectors from different models cannot be compared, so
+each embedding model has its own knowledge base. After changing `EMBEDDING_MODEL`, re-upload
+your papers and rebuild the preloaded papers (step 2). Switching only between `api` and
+`local` for the same model keeps the existing knowledge base.
+
+Older `.env` files with only `DEEPSEEK_API_KEY` and `SILICONFLOW_API_KEY` still work:
+DeepSeek is used for summaries and Q&A, SiliconFlow for metadata extraction and embeddings.
 
 ### 2. Generate the Preloaded Papers
 
@@ -69,12 +107,15 @@ python build_dataset.py
 ```
 
 The script reads the first 1000 records of the arXiv dataset, keeps the papers with a
-meaningful title and abstract (997 papers) and embeds each abstract locally with
-`BAAI/bge-large-en-v1.5`. The first run downloads the arXiv dataset (several GB) and the
-embedding model (about 1.3 GB), so it can take a while. kagglehub may ask for
-[Kaggle API credentials](https://github.com/Kaggle/kagglehub#authenticate).
+meaningful title and abstract (997 papers) and embeds each abstract with the embedding
+provider and model set in `.env`, the same ones the app uses. It also writes
+`papers_emb.meta.json`, which records the embedding model. The first run downloads the arXiv
+dataset (several GB), so it can take a while. kagglehub may ask for
+[Kaggle API credentials](https://github.com/Kaggle/kagglehub#authenticate). With
+`EMBEDDING_PROVIDER=local`, also install `requirements-local.txt`; the embedding model is
+downloaded on first use (about 1.3 GB for `BAAI/bge-large-en-v1.5`).
 
-Both downloads are stored in the `cache/` folder at the project root (ignored by git). Once `papers_emb.json` is generated you can delete `cache/`
+Downloads are stored in the `cache/` folder at the project root (ignored by git). Once `papers_emb.json` is generated you can delete `cache/`
 to free the space; it is only needed to rebuild the dataset.
 
 If you already have the dataset, pass the file directly:
@@ -152,3 +193,10 @@ Adjustable in `backend/config/settings.py`:
 - `/api/summarize` only works on the most recently uploaded paper.
 - Recommendations completed from the paper's references are generated by the LLM
   and should be verified, as they may be inaccurate.
+
+## Acknowledgements
+
+This application was built as a group project for COMP8460.
+It is the result of the shared work of all group members, who contributed to the
+research, design, implementation, testing, report and presentation of the project.
+Thanks to every member of the team for their contributions.

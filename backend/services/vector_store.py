@@ -10,7 +10,30 @@ import uuid
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 mock_data_file = BASE_DIR / 'papers_emb.json'
+# Written by build_dataset.py, records the embedding model used for papers_emb.json
+mock_data_meta_file = BASE_DIR / 'papers_emb.meta.json'
+DEFAULT_EMBEDDING_MODEL = 'BAAI/bge-large-en-v1.5'
 loaded_mock_data = False
+
+
+def collection_name_for(embedding_model: str) -> str:
+    """
+    One collection per embedding model, so vectors from different models are never mixed.
+    The default model keeps the original collection name so existing data is still used.
+    """
+    if embedding_model == DEFAULT_EMBEDDING_MODEL:
+        return "document_collection"
+    return "papers_" + re.sub(r'[^a-z0-9]+', '_', embedding_model.lower()).strip('_')
+
+
+def mock_data_embedding_model() -> str:
+    if not mock_data_meta_file.exists():
+        # papers_emb.json files built before the meta file existed used the default model
+        return DEFAULT_EMBEDDING_MODEL
+    with open(mock_data_meta_file, 'r', encoding='utf-8') as f:
+        return json.load(f).get('embedding_model', DEFAULT_EMBEDDING_MODEL)
+
+
 class VectorStore:
     
     def __init__(self, store_path: str = None):
@@ -19,13 +42,20 @@ class VectorStore:
         """
         # Initialize Chroma client
         self.client = chromadb.PersistentClient(path=store_path if store_path else Config.VECTOR_DB_PATH)
-        self.collection_name = "document_collection"
+        self.collection_name = collection_name_for(Config.EMBEDDING_MODEL)
         self.collection = self.client.get_or_create_collection(name=self.collection_name)
         self.last_processed_metadata = None
 
         if not mock_data_file.exists():
             print(f"{mock_data_file.name} not found, skipping preloaded papers. "
                   "Run `python build_dataset.py` to generate it.")
+            return
+
+        dataset_model = mock_data_embedding_model()
+        if dataset_model != Config.EMBEDDING_MODEL:
+            print(f"{mock_data_file.name} was built with {dataset_model} but EMBEDDING_MODEL is "
+                  f"{Config.EMBEDDING_MODEL}, skipping preloaded papers. "
+                  "Run `python build_dataset.py` to rebuild it.")
             return
 
         if not loaded_mock_data:

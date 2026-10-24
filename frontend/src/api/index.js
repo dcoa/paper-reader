@@ -35,7 +35,7 @@ export const clearDatabase = () => {
 }
 
 export const getSummary = () => {
-  // The backend waits up to 90s for DeepSeek, so allow more than the default timeout
+  // The backend waits up to 90s for the LLM, so allow more than the default timeout
   return api.post('/summarize', null, { timeout: 120000 })
 }
 

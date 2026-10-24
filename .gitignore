@@ -45,6 +45,7 @@ data/*
 # Generated dataset (run backend/build_dataset.py)
 backend/papers.json
 backend/papers_emb.json
+backend/papers_emb.meta.json
 
 # Downloaded arXiv dataset and embedding model (run backend/build_dataset.py)
 cache/

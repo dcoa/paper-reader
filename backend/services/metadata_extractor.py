@@ -1,13 +1,10 @@
-import json
-import requests
 from typing import Dict
-from config import Config
+from .llm_client import LLMClient, LLMError
 
 class MetadataExtractor:
     
     def __init__(self):
-        self.api_key = Config.SILICONFLOW_API_KEY or Config.DEEPSEEK_API_KEY
-        self.api_base = Config.SILICONFLOW_API_BASE if Config.SILICONFLOW_API_KEY else Config.DEEPSEEK_API_BASE
+        self.llm = LLMClient('metadata')
     
     def extract_metadata(self, text: str) -> Dict:
         prompt = f"""Extract metadata information from the following paper text and return it in JSON format.
@@ -32,43 +29,19 @@ Return only JSON format, no other explanatory text. Format as follows:
 }}"""
 
         try:
-            response = requests.post(
-                f"{self.api_base}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek-chat" if "deepseek" in self.api_base else "Qwen/Qwen2.5-7B-Instruct",
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.3
-                },
-                timeout=30
+            metadata = self.llm.chat_json(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
             )
-
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-
-                content = content.strip()
-                if content.startswith('```json'):
-                    content = content[7:]
-                if content.startswith('```'):
-                    content = content[3:]
-                if content.endswith('```'):
-                    content = content[:-3]
-                content = content.strip()
-
-                metadata = json.loads(content)
-                return metadata
-            else:
-                return self._get_default_metadata()
-
-        except Exception as e:
+        except LLMError as e:
             print(f"Metadata extraction failed: {str(e)}")
             return self._get_default_metadata()
+
+        if not isinstance(metadata, dict):
+            print("Metadata extraction failed: model did not return a JSON object")
+            return self._get_default_metadata()
+        # Fill in any field the model left out
+        return {**self._get_default_metadata(), **metadata}
 
     def _get_default_metadata(self) -> Dict:
         return {

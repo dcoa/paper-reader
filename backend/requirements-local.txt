@@ -1,0 +1,3 @@
+# Only needed for local embeddings (EMBEDDING_PROVIDER=local)
+-r requirements.txt
+sentence-transformers

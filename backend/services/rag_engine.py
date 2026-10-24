@@ -1,16 +1,14 @@
-import requests
 from typing import Dict, List
 from .vector_store import VectorStore
 from .embedder import Embedder
-from config import Config
+from .llm_client import LLMClient
 
 class RAGEngine:
 
     def __init__(self, vector_store: VectorStore = None):
         self.vector_store = vector_store if vector_store else VectorStore()
         self.embedder = Embedder()
-        self.api_key = Config.DEEPSEEK_API_KEY
-        self.api_base = Config.DEEPSEEK_API_BASE
+        self.llm = LLMClient('qa')
     
     def answer_question(self, question: str, top_k: int = 3) -> Dict:
         query_vector = self.embedder.embed_query(question)
@@ -56,27 +54,11 @@ User question: {question}
 
 Please provide an accurate and detailed answer based on the above paper content. If the paper content does not contain relevant information, please state it clearly. Answer in English."""
 
-        response = requests.post(
-            f"{self.api_base}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": "You are a professional academic paper Q&A assistant, skilled at understanding and explaining academic paper content. Always respond in English."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.7,
-                "max_tokens": 2000
-            },
-            timeout=60
+        return self.llm.chat(
+            messages=[
+                {"role": "system", "content": "You are a professional academic paper Q&A assistant, skilled at understanding and explaining academic paper content. Always respond in English."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
         )
-
-        # Raise instead of returning the error as the answer, the route logs it
-        if response.status_code != 200:
-            raise Exception(f"DeepSeek API returned {response.status_code}: {response.text[:200]}")
-
-        return response.json()['choices'][0]['message']['content']
-

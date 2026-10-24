@@ -1,14 +1,10 @@
-import json
-
-import requests
 from typing import Dict
-from config import Config
+from .llm_client import LLMClient
 
 class Summarizer:
     
     def __init__(self):
-        self.api_key = Config.DEEPSEEK_API_KEY
-        self.api_base = Config.DEEPSEEK_API_BASE
+        self.llm = LLMClient('summary')
     
     def generate_summary_and_recommendations(self, metadata: Dict, full_text: str, recomended_papers) -> Dict:
         """
@@ -55,50 +51,17 @@ Please respond in the following JSON format:
 
 Respond only with valid JSON, no additional text."""
 
-        response = requests.post(
-            f"{self.api_base}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {
-                        "role": "system", 
-                        "content": "You are an expert academic research assistant with deep knowledge of academic literature across various fields. You provide accurate summaries and recommend real, published academic papers in proper APA 7 format."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.7,
-                "max_tokens": 3000
-            },
-            timeout=90
+        parsed_result = self.llm.chat_json(
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "You are an expert academic research assistant with deep knowledge of academic literature across various fields. You provide accurate summaries and recommend real, published academic papers in proper APA 7 format."
+                },
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=3000
         )
-
-        # Raise instead of returning a placeholder so the API reports the real error
-        if response.status_code != 200:
-            try:
-                message = response.json()['error']['message']
-            except (ValueError, KeyError, TypeError):
-                message = response.text[:200]
-            raise Exception(f"DeepSeek API returned {response.status_code}: {message}")
-
-        content = response.json()['choices'][0]['message']['content']
-
-        content = content.strip()
-        if content.startswith('```json'):
-            content = content[7:]
-        if content.startswith('```'):
-            content = content[3:]
-        if content.endswith('```'):
-            content = content[:-3]
-        content = content.strip()
-
-        try:
-            parsed_result = json.loads(content)
-        except json.JSONDecodeError:
-            raise Exception("DeepSeek API returned a response that is not valid JSON")
 
         return {
             'summary': parsed_result.get('summary', 'Summary generation failed'),
